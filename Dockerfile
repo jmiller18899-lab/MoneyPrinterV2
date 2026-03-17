@@ -1,16 +1,12 @@
-FROM python:3.8
+# Updated Dockerfile for MoneyPrinterV2
 
-# Set the working directory
-WORKDIR /app/src
+FROM python:3.8-slim
 
-# Copy the requirements.txt from the parent directory
-COPY ../requirements.txt .
+# Set the working directory back to /app
+WORKDIR /app
 
-# Install the dependencies from the parent directory
-RUN pip install --no-cache-dir -r ../requirements.txt
-
-# Copy the rest of the application code
+# Copy all files into the container
 COPY . .
 
-# Set the command to run the application
-CMD ["python", "app.py"]
+# Run the application
+CMD ["python", "src/main.py"]
