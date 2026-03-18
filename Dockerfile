@@ -1,12 +1,13 @@
-# Updated Dockerfile for MoneyPrinterV2
-
 FROM python:3.8-slim
 
-# Set the working directory back to /app
+# Set the working directory
 WORKDIR /app
 
-# Copy all files into the container
-COPY . .
+# Copy the current directory contents into the container at /app
+COPY . /app
 
-# Run the application
-CMD ["python", "src/main.py"]
+# Install any needed packages specified in requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Run src/main.py when the container launches
+ENTRYPOINT ["python", "src/main.py"]
