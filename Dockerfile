@@ -10,4 +10,5 @@ COPY . /app
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Run src/main.py when the container launches
-ENTRYPOINT ["python", "src/main.py"]
+EXPOSE 5000
+ENTRYPOINT ["python", "src/web_app.py"]
