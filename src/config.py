@@ -331,7 +331,8 @@ def get_imagemagick_path() -> str:
 
 def get_openrouter_api_key() -> str:
     with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
-        return json.load(file).get("openrouter_api_key", "")
+        configured = json.load(file).get("openrouter_api_key", "")
+        return configured or os.environ.get("OPENROUTER_API_KEY", "")
 
 def get_openrouter_model() -> str:
     with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
