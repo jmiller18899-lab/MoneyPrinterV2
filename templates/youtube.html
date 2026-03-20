@@ -1,0 +1,214 @@
+{% extends "layout.html" %}
+{% block title %}YouTube Shorts — MoneyPrinterV2{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1><i class="bi bi-youtube text-danger me-2"></i>YouTube Shorts</h1>
+  <p>Manage accounts, generate AI-powered short videos, and upload to YouTube.</p>
+</div>
+
+<div class="content-area">
+  <div class="row g-4">
+
+    <!-- ── Account list ── -->
+    <div class="col-lg-7">
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <div class="card-title mb-0">Accounts</div>
+            <button class="btn btn-accent btn-sm" data-bs-toggle="modal" data-bs-target="#addAccountModal">
+              <i class="bi bi-plus-lg me-1"></i>Add Account
+            </button>
+          </div>
+          <div id="accounts-table-wrap">
+            <div class="text-muted" style="font-size:.88rem">Loading…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Video history ── -->
+    <div class="col-lg-5">
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="card-title mb-3">Video History</div>
+          <div class="text-muted mb-2" style="font-size:.82rem" id="video-hint">Select an account to view its videos.</div>
+          <div id="videos-table-wrap"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Add Account Modal ── -->
+<div class="modal fade" id="addAccountModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content" style="background:#1a1a2e">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Add YouTube Account</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Nickname</label>
+          <input id="yt-nickname" class="form-control" placeholder="e.g. TechChannel" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Firefox Profile Path</label>
+          <input id="yt-profile" class="form-control" placeholder="/path/to/firefox/profile" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Niche</label>
+          <input id="yt-niche" class="form-control" placeholder="e.g. Tech Tips" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Language</label>
+          <input id="yt-language" class="form-control" value="English" />
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-accent" id="btn-add-account">Add Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Generate Modal ── -->
+<div class="modal fade" id="generateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content" style="background:#1a1a2e">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title" id="generateModalLabel">Generate Video</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted" style="font-size:.88rem">This will use your Ollama model + Gemini image API to create a full YouTube Short.</p>
+        <div class="form-check form-switch mt-3">
+          <input class="form-check-input" type="checkbox" id="yt-upload-toggle">
+          <label class="form-check-label" for="yt-upload-toggle">Upload to YouTube after generation</label>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-accent" id="btn-start-generate">Generate</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let _selectedAccountId = null;
+
+async function loadAccounts() {
+  const accounts = await fetch('/api/accounts/youtube').then(r => r.json());
+  const wrap = document.getElementById('accounts-table-wrap');
+
+  if (!accounts.length) {
+    wrap.innerHTML = '<div class="text-muted" style="font-size:.88rem">No accounts yet. Add one above.</div>';
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table class="table table-hover align-middle">
+      <thead><tr><th>#</th><th>Nickname</th><th>Niche</th><th>Videos</th><th></th></tr></thead>
+      <tbody>
+        ${accounts.map((a, i) => `
+          <tr data-id="${a.id}" style="cursor:pointer">
+            <td class="text-muted">${i+1}</td>
+            <td class="fw-semibold">${a.nickname}</td>
+            <td>${a.niche}</td>
+            <td><span class="badge bg-secondary">${(a.videos||[]).length}</span></td>
+            <td class="text-end">
+              <button class="btn btn-sm btn-outline-primary btn-generate" data-id="${a.id}" data-name="${a.nickname}">
+                <i class="bi bi-magic me-1"></i>Generate
+              </button>
+              <button class="btn btn-sm btn-outline-danger btn-delete ms-1" data-id="${a.id}">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  // Click row → show videos
+  wrap.querySelectorAll('tr[data-id]').forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.closest('button')) return;
+      loadVideos(row.dataset.id, accounts.find(a => a.id === row.dataset.id)?.nickname);
+    };
+  });
+
+  // Generate button
+  wrap.querySelectorAll('.btn-generate').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      _selectedAccountId = btn.dataset.id;
+      document.getElementById('generateModalLabel').textContent = `Generate — ${btn.dataset.name}`;
+      new bootstrap.Modal(document.getElementById('generateModal')).show();
+    };
+  });
+
+  // Delete button
+  wrap.querySelectorAll('.btn-delete').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm('Delete this account?')) return;
+      await apiDelete(`/api/accounts/youtube/${btn.dataset.id}`);
+      loadAccounts();
+    };
+  });
+}
+
+async function loadVideos(accountId, nickname) {
+  _selectedAccountId = accountId;
+  const videos = await fetch(`/api/videos/${accountId}`).then(r => r.json());
+  const wrap = document.getElementById('videos-table-wrap');
+  document.getElementById('video-hint').textContent = `Videos for: ${nickname}`;
+
+  if (!videos.length) {
+    wrap.innerHTML = '<div class="text-muted" style="font-size:.88rem">No videos yet.</div>';
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table class="table table-sm align-middle">
+      <thead><tr><th>#</th><th>Date</th><th>Title</th></tr></thead>
+      <tbody>
+        ${videos.map((v, i) => `
+          <tr>
+            <td class="text-muted">${i+1}</td>
+            <td class="text-muted" style="white-space:nowrap;font-size:.8rem">${v.date || '—'}</td>
+            <td style="font-size:.84rem">${(v.title||'').slice(0,55)}…</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+// Add account
+document.getElementById('btn-add-account').onclick = async () => {
+  const nickname = document.getElementById('yt-nickname').value.trim();
+  const profile  = document.getElementById('yt-profile').value.trim();
+  const niche    = document.getElementById('yt-niche').value.trim();
+  const language = document.getElementById('yt-language').value.trim();
+  if (!nickname || !profile || !niche) return alert('Please fill in all fields.');
+  await apiPost('/api/accounts/youtube', { nickname, firefox_profile: profile, niche, language });
+  bootstrap.Modal.getInstance(document.getElementById('addAccountModal')).hide();
+  loadAccounts();
+};
+
+// Generate
+document.getElementById('btn-start-generate').onclick = async () => {
+  if (!_selectedAccountId) return;
+  const upload = document.getElementById('yt-upload-toggle').checked;
+  const res = await apiPost('/api/youtube/generate', { account_id: _selectedAccountId, upload });
+  bootstrap.Modal.getInstance(document.getElementById('generateModal')).hide();
+  startTaskPoll(res.task_id, 'YouTube Short', (ok) => { if (ok) loadAccounts(); });
+};
+
+loadAccounts();
+</script>
+{% endblock %}

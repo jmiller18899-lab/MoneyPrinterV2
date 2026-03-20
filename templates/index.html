@@ -1,0 +1,151 @@
+{% extends "layout.html" %}
+{% block title %}Dashboard — MoneyPrinterV2{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Dashboard</h1>
+  <p>Overview of all your automation accounts and activity.</p>
+</div>
+
+<div class="content-area">
+
+  <!-- ── Stat cards ── -->
+  <div class="row g-3 mb-4" id="stats-row">
+    <div class="col-6 col-xl-3">
+      <div class="card stat-card p-3">
+        <div class="d-flex align-items-center gap-3">
+          <div class="stat-icon bg-danger bg-opacity-25 text-danger"><i class="bi bi-youtube"></i></div>
+          <div>
+            <div class="text-muted" style="font-size:.78rem">YT Accounts</div>
+            <div class="fw-bold fs-5" id="stat-yt-accounts">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="card stat-card p-3">
+        <div class="d-flex align-items-center gap-3">
+          <div class="stat-icon bg-primary bg-opacity-25 text-primary"><i class="bi bi-twitter-x"></i></div>
+          <div>
+            <div class="text-muted" style="font-size:.78rem">Twitter Accounts</div>
+            <div class="fw-bold fs-5" id="stat-tw-accounts">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="card stat-card p-3">
+        <div class="d-flex align-items-center gap-3">
+          <div class="stat-icon bg-success bg-opacity-25 text-success"><i class="bi bi-camera-video"></i></div>
+          <div>
+            <div class="text-muted" style="font-size:.78rem">Videos Generated</div>
+            <div class="fw-bold fs-5" id="stat-videos">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="card stat-card p-3">
+        <div class="d-flex align-items-center gap-3">
+          <div class="stat-icon bg-warning bg-opacity-25 text-warning"><i class="bi bi-chat-square-text"></i></div>
+          <div>
+            <div class="text-muted" style="font-size:.78rem">Tweets Posted</div>
+            <div class="fw-bold fs-5" id="stat-tweets">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Model selector ── -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+          <div class="card-title mb-0"><i class="bi bi-cpu me-2"></i>Ollama Model</div>
+          <div class="text-muted" style="font-size:.82rem">Active model used for all content generation</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <select class="form-select form-select-sm" id="model-select" style="min-width:200px">
+            <option value="">Loading models…</option>
+          </select>
+          <button class="btn btn-accent btn-sm" id="btn-set-model">Set</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Quick actions ── -->
+  <div class="row g-3">
+    <div class="col-md-6 col-xl-3">
+      <a href="/youtube" class="card text-decoration-none h-100">
+        <div class="card-body d-flex flex-column align-items-center justify-content-center py-4 gap-2">
+          <i class="bi bi-youtube text-danger fs-2"></i>
+          <div class="fw-semibold">YouTube Shorts</div>
+          <div class="text-muted text-center" style="font-size:.82rem">Generate &amp; upload AI-powered short videos</div>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <a href="/twitter" class="card text-decoration-none h-100">
+        <div class="card-body d-flex flex-column align-items-center justify-content-center py-4 gap-2">
+          <i class="bi bi-twitter-x text-primary fs-2"></i>
+          <div class="fw-semibold">Twitter Bot</div>
+          <div class="text-muted text-center" style="font-size:.82rem">Auto-generate and post AI tweets</div>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <a href="/afm" class="card text-decoration-none h-100">
+        <div class="card-body d-flex flex-column align-items-center justify-content-center py-4 gap-2">
+          <i class="bi bi-bag-check text-success fs-2"></i>
+          <div class="fw-semibold">Affiliate Marketing</div>
+          <div class="text-muted text-center" style="font-size:.82rem">Scrape Amazon products and create pitches</div>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <a href="/outreach" class="card text-decoration-none h-100">
+        <div class="card-body d-flex flex-column align-items-center justify-content-center py-4 gap-2">
+          <i class="bi bi-envelope-paper text-warning fs-2"></i>
+          <div class="fw-semibold">Outreach</div>
+          <div class="text-muted text-center" style="font-size:.82rem">Scrape local businesses and email them</div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(async () => {
+  // Load stats
+  const stats = await fetch('/api/stats').then(r => r.json());
+  document.getElementById('stat-yt-accounts').textContent = stats.youtube_accounts;
+  document.getElementById('stat-tw-accounts').textContent = stats.twitter_accounts;
+  document.getElementById('stat-videos').textContent      = stats.videos_generated;
+  document.getElementById('stat-tweets').textContent      = stats.tweets_posted;
+
+  // Load models
+  const activeRes = await fetch('/api/models/active').then(r => r.json());
+  const modelsRes = await fetch('/api/models').then(r => r.json());
+  const sel = document.getElementById('model-select');
+  if (Array.isArray(modelsRes)) {
+    sel.innerHTML = modelsRes.map(m =>
+      `<option value="${m}" ${m === activeRes.model ? 'selected' : ''}>${m}</option>`
+    ).join('');
+  } else {
+    sel.innerHTML = '<option>Could not reach Ollama</option>';
+  }
+
+  document.getElementById('btn-set-model').onclick = async () => {
+    const model = sel.value;
+    await apiPost('/api/models/select', { model });
+    sel.options[sel.selectedIndex].selected = true;
+    alert(`Model set to: ${model}`);
+  };
+})();
+</script>
+{% endblock %}

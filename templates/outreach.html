@@ -1,0 +1,78 @@
+{% extends "layout.html" %}
+{% block title %}Outreach — MoneyPrinterV2{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1><i class="bi bi-envelope-paper text-warning me-2"></i>Local Business Outreach</h1>
+  <p>Scrape Google Maps for local businesses and send cold outreach emails.</p>
+</div>
+
+<div class="content-area">
+  <div class="row g-4">
+
+    <!-- ── Run card ── -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-body">
+          <div class="card-title">Run Outreach Campaign</div>
+          <p class="text-muted" style="font-size:.88rem">
+            This will use the Google Maps scraper (requires Go) to find businesses in the
+            niche configured in <code>config.json</code>, extract their emails, and send
+            your HTML outreach email via Gmail SMTP.
+          </p>
+          <div class="alert alert-warning d-flex gap-2 align-items-start p-2" style="font-size:.82rem">
+            <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+            <div>Make sure <strong>Go</strong> is installed and your email credentials are set in Config before running.</div>
+          </div>
+          <button class="btn btn-accent" id="btn-run-outreach">
+            <i class="bi bi-play-fill me-1"></i>Start Outreach
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Config preview ── -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-body">
+          <div class="card-title">Outreach Config Preview</div>
+          <div id="config-preview">
+            <div class="text-muted" style="font-size:.88rem">Loading…</div>
+          </div>
+          <a href="/config" class="btn btn-outline-secondary btn-sm mt-3">
+            <i class="bi bi-pencil me-1"></i>Edit Config
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('btn-run-outreach').onclick = async () => {
+  if (!confirm('Start outreach campaign? This may take several minutes.')) return;
+  const res = await apiPost('/api/outreach/run', {});
+  startTaskPoll(res.task_id, 'Outreach Campaign', () => {});
+};
+
+(async () => {
+  const cfg = await fetch('/api/config').then(r => r.json());
+  const fields = [
+    ['Niche',        cfg.google_maps_scraper_niche || '(not set)'],
+    ['Email',        cfg.email?.username || '(not set)'],
+    ['SMTP Server',  cfg.email?.smtp_server || 'smtp.gmail.com'],
+    ['Subject',      cfg.outreach_message_subject || '(not set)'],
+    ['Body File',    cfg.outreach_message_body_file || '(not set)'],
+    ['Timeout',      (cfg.scraper_timeout || 300) + 's'],
+  ];
+  document.getElementById('config-preview').innerHTML = fields.map(([k, v]) => `
+    <div class="d-flex justify-content-between border-bottom border-secondary py-1" style="font-size:.84rem">
+      <span class="text-muted">${k}</span>
+      <span class="fw-semibold text-truncate ms-3" style="max-width:200px" title="${v}">${v}</span>
+    </div>`).join('');
+})();
+</script>
+{% endblock %}

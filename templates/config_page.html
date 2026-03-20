@@ -1,0 +1,152 @@
+{% extends "layout.html" %}
+{% block title %}Config — MoneyPrinterV2{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1><i class="bi bi-gear me-2"></i>Configuration</h1>
+  <p>Edit <code>config.json</code> directly in the browser.</p>
+</div>
+
+<div class="content-area">
+  <div class="card">
+    <div class="card-body">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="card-title mb-0">config.json</div>
+        <button class="btn btn-accent btn-sm" id="btn-save-config">
+          <i class="bi bi-floppy me-1"></i>Save
+        </button>
+      </div>
+      <div id="save-alert" class="alert d-none mb-3" style="font-size:.85rem"></div>
+
+      <!-- Structured form -->
+      <div id="config-form">
+        <div class="text-muted" style="font-size:.88rem">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let _cfg = {};
+
+const FIELDS = [
+  { key: 'verbose',            label: 'Verbose Logging',         type: 'bool' },
+  { key: 'headless',           label: 'Headless Browser',        type: 'bool' },
+  { key: 'firefox_profile',    label: 'Firefox Profile Path',    type: 'str', placeholder: '/path/to/profile' },
+  { key: 'ollama_base_url',    label: 'Ollama Base URL',         type: 'str', placeholder: 'http://127.0.0.1:11434' },
+  { key: 'ollama_model',       label: 'Ollama Model',            type: 'str', placeholder: 'leave empty to pick at startup' },
+  { key: 'twitter_language',   label: 'Twitter Language',        type: 'str', placeholder: 'English' },
+  { key: 'nanobanana2_api_key',label: 'Gemini API Key',          type: 'str', placeholder: 'your-api-key' },
+  { key: 'nanobanana2_aspect_ratio', label: 'Image Aspect Ratio', type: 'str', placeholder: '9:16' },
+  { key: 'threads',            label: 'MoviePy Threads',         type: 'num' },
+  { key: 'zip_url',            label: 'Background Music ZIP URL',type: 'str', placeholder: 'https://…' },
+  { key: 'is_for_kids',        label: 'YouTube: Is For Kids',    type: 'bool' },
+  { key: 'imagemagick_path',   label: 'ImageMagick Path',        type: 'str', placeholder: '/usr/bin/convert' },
+  { key: 'tts_voice',          label: 'TTS Voice',               type: 'str', placeholder: 'Jasper' },
+  { key: 'stt_provider',       label: 'STT Provider',            type: 'str', placeholder: 'local_whisper or third_party_assemblyai' },
+  { key: 'whisper_model',      label: 'Whisper Model',           type: 'str', placeholder: 'base' },
+  { key: 'assembly_ai_api_key',label: 'AssemblyAI API Key',      type: 'str', placeholder: 'your-api-key' },
+  { key: 'script_sentence_length', label: 'Script Sentence Length', type: 'num' },
+  { key: 'google_maps_scraper_niche', label: 'Outreach Niche',   type: 'str', placeholder: 'e.g. dentists in New York' },
+  { key: 'scraper_timeout',    label: 'Scraper Timeout (s)',      type: 'num' },
+  { key: 'outreach_message_subject', label: 'Outreach Subject',  type: 'str' },
+  { key: 'outreach_message_body_file', label: 'Outreach Body File', type: 'str', placeholder: 'outreach_message.html' },
+];
+
+const EMAIL_FIELDS = [
+  { key: 'smtp_server', label: 'SMTP Server', placeholder: 'smtp.gmail.com' },
+  { key: 'smtp_port',   label: 'SMTP Port',   type: 'num' },
+  { key: 'username',    label: 'Email Address' },
+  { key: 'password',    label: 'App Password',  type: 'password' },
+];
+
+function renderForm(cfg) {
+  const col = (f) => {
+    const val = cfg[f.key] ?? '';
+    if (f.type === 'bool') {
+      return `
+        <div class="mb-3 d-flex align-items-center justify-content-between border-bottom border-secondary pb-2">
+          <label class="form-check-label" style="font-size:.88rem">${f.label}</label>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="cfg-${f.key}" ${val ? 'checked' : ''} />
+          </div>
+        </div>`;
+    }
+    const inputType = f.type === 'password' ? 'password' : 'text';
+    return `
+      <div class="mb-3">
+        <label class="form-label" style="font-size:.82rem;color:#aaa">${f.label}</label>
+        <input class="form-control form-control-sm" id="cfg-${f.key}"
+          type="${inputType}" value="${String(val).replace(/"/g,'&quot;')}"
+          placeholder="${f.placeholder || ''}" />
+      </div>`;
+  };
+
+  const emailSection = `
+    <div class="mb-3 mt-2">
+      <div class="fw-semibold mb-2" style="font-size:.88rem;color:#aaa">Email / SMTP</div>
+      ${EMAIL_FIELDS.map(f => {
+        const val = (cfg.email || {})[f.key] ?? '';
+        const inputType = f.type === 'password' ? 'password' : 'text';
+        return `
+          <div class="mb-3">
+            <label class="form-label" style="font-size:.82rem;color:#aaa">${f.label}</label>
+            <input class="form-control form-control-sm" id="email-${f.key}"
+              type="${inputType}" value="${String(val).replace(/"/g,'&quot;')}"
+              placeholder="${f.placeholder || ''}" />
+          </div>`;
+      }).join('')}
+    </div>`;
+
+  document.getElementById('config-form').innerHTML = `
+    <div class="row g-3">
+      <div class="col-md-6">${FIELDS.slice(0, Math.ceil(FIELDS.length/2)).map(col).join('')}</div>
+      <div class="col-md-6">
+        ${FIELDS.slice(Math.ceil(FIELDS.length/2)).map(col).join('')}
+        ${emailSection}
+      </div>
+    </div>`;
+}
+
+function collectForm(cfg) {
+  const out = { ...cfg };
+  for (const f of FIELDS) {
+    const el = document.getElementById(`cfg-${f.key}`);
+    if (!el) continue;
+    if (f.type === 'bool') out[f.key] = el.checked;
+    else if (f.type === 'num') out[f.key] = Number(el.value) || 0;
+    else out[f.key] = el.value;
+  }
+  out.email = { ...(cfg.email || {}) };
+  for (const f of EMAIL_FIELDS) {
+    const el = document.getElementById(`email-${f.key}`);
+    if (!el) continue;
+    out.email[f.key] = f.type === 'num' ? Number(el.value) : el.value;
+  }
+  return out;
+}
+
+document.getElementById('btn-save-config').onclick = async () => {
+  const updated = collectForm(_cfg);
+  const res = await apiPost('/api/config', updated);
+  const alertEl = document.getElementById('save-alert');
+  if (res.ok) {
+    alertEl.className = 'alert alert-success mb-3';
+    alertEl.textContent = 'Configuration saved successfully.';
+    _cfg = updated;
+  } else {
+    alertEl.className = 'alert alert-danger mb-3';
+    alertEl.textContent = 'Failed to save configuration.';
+  }
+  alertEl.classList.remove('d-none');
+  setTimeout(() => alertEl.classList.add('d-none'), 3000);
+};
+
+(async () => {
+  _cfg = await fetch('/api/config').then(r => r.json());
+  renderForm(_cfg);
+})();
+</script>
+{% endblock %}

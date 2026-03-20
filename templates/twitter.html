@@ -1,0 +1,163 @@
+{% extends "layout.html" %}
+{% block title %}Twitter Bot — MoneyPrinterV2{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1><i class="bi bi-twitter-x me-2"></i>Twitter Bot</h1>
+  <p>Manage Twitter accounts and auto-generate AI tweets.</p>
+</div>
+
+<div class="content-area">
+  <div class="row g-4">
+
+    <!-- ── Account list ── -->
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <div class="card-title mb-0">Accounts</div>
+            <button class="btn btn-accent btn-sm" data-bs-toggle="modal" data-bs-target="#addTwAccountModal">
+              <i class="bi bi-plus-lg me-1"></i>Add Account
+            </button>
+          </div>
+          <div id="tw-accounts-wrap">
+            <div class="text-muted" style="font-size:.88rem">Loading…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Post history ── -->
+    <div class="col-lg-5">
+      <div class="card">
+        <div class="card-body">
+          <div class="card-title mb-3">Post History</div>
+          <div class="text-muted mb-2" style="font-size:.82rem" id="post-hint">Select an account to view its posts.</div>
+          <div id="posts-wrap"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Add Account Modal ── -->
+<div class="modal fade" id="addTwAccountModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content" style="background:#1a1a2e">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Add Twitter Account</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Nickname</label>
+          <input id="tw-nickname" class="form-control" placeholder="e.g. TechBot" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Firefox Profile Path</label>
+          <input id="tw-profile" class="form-control" placeholder="/path/to/firefox/profile" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Topic</label>
+          <input id="tw-topic" class="form-control" placeholder="e.g. Artificial Intelligence" />
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-accent" id="btn-add-tw-account">Add Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadTwAccounts() {
+  const accounts = await fetch('/api/accounts/twitter').then(r => r.json());
+  const wrap = document.getElementById('tw-accounts-wrap');
+
+  if (!accounts.length) {
+    wrap.innerHTML = '<div class="text-muted" style="font-size:.88rem">No accounts yet. Add one above.</div>';
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table class="table table-hover align-middle">
+      <thead><tr><th>#</th><th>Nickname</th><th>Topic</th><th>Posts</th><th></th></tr></thead>
+      <tbody>
+        ${accounts.map((a, i) => `
+          <tr data-id="${a.id}" style="cursor:pointer">
+            <td class="text-muted">${i+1}</td>
+            <td class="fw-semibold">${a.nickname}</td>
+            <td>${a.topic}</td>
+            <td><span class="badge bg-secondary">${(a.posts||[]).length}</span></td>
+            <td class="text-end">
+              <button class="btn btn-sm btn-outline-primary btn-post" data-id="${a.id}" data-name="${a.nickname}">
+                <i class="bi bi-send me-1"></i>Post
+              </button>
+              <button class="btn btn-sm btn-outline-danger btn-del ms-1" data-id="${a.id}">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  wrap.querySelectorAll('tr[data-id]').forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.closest('button')) return;
+      loadPosts(row.dataset.id, accounts.find(a => a.id === row.dataset.id)?.nickname);
+    };
+  });
+
+  wrap.querySelectorAll('.btn-post').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Post a tweet for "${btn.dataset.name}"?`)) return;
+      const res = await apiPost('/api/twitter/post', { account_id: btn.dataset.id });
+      startTaskPoll(res.task_id, `Tweet — ${btn.dataset.name}`, (ok) => { if (ok) loadTwAccounts(); });
+    };
+  });
+
+  wrap.querySelectorAll('.btn-del').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm('Delete this account?')) return;
+      await apiDelete(`/api/accounts/twitter/${btn.dataset.id}`);
+      loadTwAccounts();
+    };
+  });
+}
+
+async function loadPosts(accountId, nickname) {
+  const posts = await fetch(`/api/posts/${accountId}`).then(r => r.json());
+  const wrap = document.getElementById('posts-wrap');
+  document.getElementById('post-hint').textContent = `Posts for: ${nickname}`;
+
+  if (!posts.length) {
+    wrap.innerHTML = '<div class="text-muted" style="font-size:.88rem">No posts yet.</div>';
+    return;
+  }
+
+  wrap.innerHTML = posts.map(p => `
+    <div class="border border-secondary rounded p-2 mb-2" style="font-size:.84rem">
+      <div class="text-muted mb-1" style="font-size:.75rem">${p.date || '—'}</div>
+      ${p.content || ''}
+    </div>`).join('');
+}
+
+document.getElementById('btn-add-tw-account').onclick = async () => {
+  const nickname = document.getElementById('tw-nickname').value.trim();
+  const profile  = document.getElementById('tw-profile').value.trim();
+  const topic    = document.getElementById('tw-topic').value.trim();
+  if (!nickname || !profile || !topic) return alert('Please fill in all fields.');
+  await apiPost('/api/accounts/twitter', { nickname, firefox_profile: profile, topic });
+  bootstrap.Modal.getInstance(document.getElementById('addTwAccountModal')).hide();
+  loadTwAccounts();
+};
+
+loadTwAccounts();
+</script>
+{% endblock %}

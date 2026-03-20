@@ -1,0 +1,121 @@
+{% extends "layout.html" %}
+{% block title %}Affiliate Marketing — MoneyPrinterV2{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1><i class="bi bi-bag-check text-success me-2"></i>Affiliate Marketing</h1>
+  <p>Add Amazon affiliate products and generate AI pitches posted via Twitter.</p>
+</div>
+
+<div class="content-area">
+  <div class="card">
+    <div class="card-body">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="card-title mb-0">Products</div>
+        <button class="btn btn-accent btn-sm" data-bs-toggle="modal" data-bs-target="#addProductModal">
+          <i class="bi bi-plus-lg me-1"></i>Add Product
+        </button>
+      </div>
+      <div id="products-wrap">
+        <div class="text-muted" style="font-size:.88rem">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add Product Modal ── -->
+<div class="modal fade" id="addProductModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content" style="background:#1a1a2e">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">Add Affiliate Product</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Amazon Affiliate Link</label>
+          <input id="afm-link" class="form-control" placeholder="https://www.amazon.com/dp/…" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Twitter Account UUID</label>
+          <select id="afm-twitter-account" class="form-select">
+            <option value="">Loading…</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-accent" id="btn-add-product">Add &amp; Run Pitch</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadProducts() {
+  const products = await fetch('/api/products').then(r => r.json());
+  const wrap = document.getElementById('products-wrap');
+
+  if (!products.length) {
+    wrap.innerHTML = '<div class="text-muted" style="font-size:.88rem">No products yet. Add one above.</div>';
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table class="table align-middle">
+      <thead><tr><th>#</th><th>Affiliate Link</th><th>Twitter Account</th><th></th></tr></thead>
+      <tbody>
+        ${products.map((p, i) => `
+          <tr>
+            <td class="text-muted">${i+1}</td>
+            <td style="font-size:.84rem;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.affiliate_link}</td>
+            <td class="text-muted" style="font-size:.78rem">${p.twitter_uuid}</td>
+            <td class="text-end">
+              <button class="btn btn-sm btn-outline-success btn-run" data-id="${p.id}">
+                <i class="bi bi-play-fill me-1"></i>Run Pitch
+              </button>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  wrap.querySelectorAll('.btn-run').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('Generate and share a pitch for this product?')) return;
+      const res = await apiPost('/api/afm/run', { product_id: btn.dataset.id });
+      startTaskPoll(res.task_id, 'Affiliate Pitch', () => {});
+    };
+  });
+}
+
+async function loadTwitterAccountsForSelect() {
+  const accounts = await fetch('/api/accounts/twitter').then(r => r.json());
+  const sel = document.getElementById('afm-twitter-account');
+  if (!accounts.length) {
+    sel.innerHTML = '<option value="">No Twitter accounts configured</option>';
+  } else {
+    sel.innerHTML = accounts.map(a =>
+      `<option value="${a.id}">${a.nickname} (${a.topic})</option>`
+    ).join('');
+  }
+}
+
+document.getElementById('addProductModal').addEventListener('show.bs.modal', loadTwitterAccountsForSelect);
+
+document.getElementById('btn-add-product').onclick = async () => {
+  const link       = document.getElementById('afm-link').value.trim();
+  const twitterId  = document.getElementById('afm-twitter-account').value;
+  if (!link || !twitterId) return alert('Please fill in all fields.');
+  const res = await apiPost('/api/products', { affiliate_link: link, twitter_uuid: twitterId });
+  // Also immediately run the pitch
+  const taskRes = await apiPost('/api/afm/run', { product_id: res.id });
+  bootstrap.Modal.getInstance(document.getElementById('addProductModal')).hide();
+  startTaskPoll(taskRes.task_id, 'Affiliate Pitch', () => loadProducts());
+  loadProducts();
+};
+
+loadProducts();
+</script>
+{% endblock %}
