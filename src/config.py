@@ -329,6 +329,14 @@ def get_imagemagick_path() -> str:
     with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
         return json.load(file)["imagemagick_path"]
 
+def get_openrouter_api_key() -> str:
+    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+        return json.load(file).get("openrouter_api_key", "")
+
+def get_openrouter_model() -> str:
+    with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
+        return json.load(file).get("openrouter_model", "meta-llama/llama-3.1-8b-instruct:free")
+
 def get_script_sentence_length() -> int:
     """
     Gets the forced script's sentence length.

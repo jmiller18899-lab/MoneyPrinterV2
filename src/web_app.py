@@ -14,7 +14,7 @@ import json  # noqa: E402
 from uuid import uuid4  # noqa: E402
 
 from cache import get_accounts, add_account, remove_account, get_products, add_product  # noqa: E402
-from config import ROOT_DIR, assert_folder_structure, get_ollama_model  # noqa: E402
+from config import ROOT_DIR, assert_folder_structure, get_ollama_model, get_openrouter_api_key, get_openrouter_model  # noqa: E402
 from utils import rem_temp_files  # noqa: E402
 import llm_provider  # noqa: E402
 
@@ -54,9 +54,12 @@ def _init() -> None:
     except Exception:
         pass
     try:
-        model = get_ollama_model()
-        if model:
-            llm_provider.select_model(model)
+        if get_openrouter_api_key():
+            llm_provider.select_model(get_openrouter_model())
+        else:
+            model = get_ollama_model()
+            if model:
+                llm_provider.select_model(model)
     except Exception:
         pass
 
