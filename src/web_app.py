@@ -49,10 +49,16 @@ def _run_in_bg(tid: str, fn, *args, **kwargs) -> None:
 
 def _init() -> None:
     assert_folder_structure()
-    rem_temp_files()
-    model = get_ollama_model()
-    if model:
-        llm_provider.select_model(model)
+    try:
+        rem_temp_files()
+    except Exception:
+        pass
+    try:
+        model = get_ollama_model()
+        if model:
+            llm_provider.select_model(model)
+    except Exception:
+        pass
 
 
 # ── API: tasks ─────────────────────────────────────────────────────────────────

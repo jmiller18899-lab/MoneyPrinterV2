@@ -16,7 +16,11 @@ def assert_folder_structure() -> None:
     """
     # Create the .mp folder
     if not os.path.exists(os.path.join(ROOT_DIR, ".mp")):
-        if get_verbose():
+        try:
+            verbose = get_verbose()
+        except Exception:
+            verbose = False
+        if verbose:
             print(colored(f"=> Creating .mp folder at {os.path.join(ROOT_DIR, '.mp')}", "green"))
         os.makedirs(os.path.join(ROOT_DIR, ".mp"))
 
