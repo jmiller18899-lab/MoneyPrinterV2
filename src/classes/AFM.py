@@ -1,175 +1,100 @@
-import os
+import requests
+from bs4 import BeautifulSoup
 from urllib.parse import urlparse
-from typing import Any
 
 from status import *
 from config import *
-from constants import *
 from llm_provider import generate_text
 from .Twitter import Twitter
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.service import Service
-from selenium.webdriver.firefox.options import Options
-from webdriver_manager.firefox import GeckoDriverManager
+
+_SCRAPE_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
 
 
 class AffiliateMarketing:
     """
-    This class will be used to handle all the affiliate marketing related operations.
+    Handles affiliate marketing: scrapes Amazon product info via HTTP,
+    generates an LLM pitch, and posts it to Twitter via the API.
     """
 
     def __init__(
         self,
         affiliate_link: str,
-        fp_profile_path: str,
         twitter_account_uuid: str,
         account_nickname: str,
         topic: str,
+        api_key: str,
+        api_secret: str,
+        access_token: str,
+        access_token_secret: str,
     ) -> None:
-        """
-        Initializes the Affiliate Marketing class.
-
-        Args:
-            affiliate_link (str): The affiliate link
-            fp_profile_path (str): The path to the Firefox profile
-            twitter_account_uuid (str): The Twitter account UUID
-            account_nickname (str): The account nickname
-            topic (str): The topic of the product
-
-        Returns:
-            None
-        """
-        self._fp_profile_path: str = fp_profile_path
-
-        # Initialize the Firefox profile
-        self.options: Options = Options()
-
-        # Set headless state of browser
-        if get_headless():
-            self.options.add_argument("--headless")
-
-        if not os.path.isdir(fp_profile_path):
-            raise ValueError(
-                f"Firefox profile path does not exist or is not a directory: {fp_profile_path}"
-            )
-
-        # Set the profile path
-        self.options.add_argument("-profile")
-        self.options.add_argument(fp_profile_path)
-
-        # Set the service
-        self.service: Service = Service(GeckoDriverManager().install())
-
-        # Initialize the browser
-        self.browser: webdriver.Firefox = webdriver.Firefox(
-            service=self.service, options=self.options
-        )
-
-        # Set the affiliate link
-        self.affiliate_link: str = affiliate_link
-
-        parsed_link = urlparse(self.affiliate_link)
+        parsed_link = urlparse(affiliate_link)
         if parsed_link.scheme not in ["http", "https"] or not parsed_link.netloc:
             raise ValueError(
-                f"Affiliate link is invalid. Expected a full URL, got: {self.affiliate_link}"
+                f"Affiliate link is invalid. Expected a full URL, got: {affiliate_link}"
             )
 
-        # Set the Twitter account UUID
+        self.affiliate_link: str = affiliate_link
         self.account_uuid: str = twitter_account_uuid
-
-        # Set the Twitter account nickname
         self.account_nickname: str = account_nickname
-
-        # Set the Twitter topic
         self.topic: str = topic
+        self._api_key = api_key
+        self._api_secret = api_secret
+        self._access_token = access_token
+        self._access_token_secret = access_token_secret
 
-        # Scrape the product information
         self.scrape_product_information()
 
     def scrape_product_information(self) -> None:
-        """
-        This method will be used to scrape the product
-        information from the affiliate link.
-        """
-        # Open the affiliate link
-        self.browser.get(self.affiliate_link)
+        response = requests.get(self.affiliate_link, headers=_SCRAPE_HEADERS, timeout=15)
+        response.raise_for_status()
 
-        # Get the product name
-        product_title: str = self.browser.find_element(
-            By.ID, AMAZON_PRODUCT_TITLE_ID
-        ).text
+        soup = BeautifulSoup(response.content, "html.parser")
 
-        # Get the features of the product
-        features: Any = self.browser.find_elements(By.ID, AMAZON_FEATURE_BULLETS_ID)
+        title_el = soup.find(id="productTitle")
+        self.product_title: str = title_el.get_text(strip=True) if title_el else "Unknown Product"
+
+        bullets_el = soup.find(id="feature-bullets")
+        if bullets_el:
+            items = bullets_el.find_all("span", class_="a-list-item")
+            self.features: str = " | ".join(
+                i.get_text(strip=True) for i in items if i.get_text(strip=True)
+            )
+        else:
+            self.features = ""
 
         if get_verbose():
-            info(f"Product Title: {product_title}")
-
-        if get_verbose():
-            info(f"Features: {features}")
-
-        # Set the product title
-        self.product_title: str = product_title
-
-        # Set the features
-        self.features: Any = features
-
-    def generate_response(self, prompt: str) -> str:
-        """
-        This method will be used to generate the response for the user.
-
-        Args:
-            prompt (str): The prompt for the user.
-
-        Returns:
-            response (str): The response for the user.
-        """
-        return generate_text(prompt)
+            info(f"Product Title: {self.product_title}")
+            info(f"Features: {self.features[:120]}…")
 
     def generate_pitch(self) -> str:
-        """
-        This method will be used to generate a pitch for the product.
-
-        Returns:
-            pitch (str): The pitch for the product.
-        """
-        # Generate the response
-        pitch: str = (
-            self.generate_response(
-                f'I want to promote this product on my website. Generate a brief pitch about this product, return nothing else except the pitch. Information:\nTitle: "{self.product_title}"\nFeatures: "{str(self.features)}"'
+        self.pitch: str = (
+            generate_text(
+                f'I want to promote this product on my website. Generate a brief pitch about this '
+                f'product, return nothing else except the pitch. Information:\n'
+                f'Title: "{self.product_title}"\nFeatures: "{self.features}"'
             )
             + "\nYou can buy the product here: "
             + self.affiliate_link
         )
-
-        self.pitch: str = pitch
-
-        # Return the response
-        return pitch
+        return self.pitch
 
     def share_pitch(self, where: str) -> None:
-        """
-        This method will be used to share the pitch on the specified platform.
-
-        Args:
-            where (str): The platform where the pitch will be shared.
-        """
         if where == "twitter":
-            # Initialize the Twitter class
-            twitter: Twitter = Twitter(
+            twitter = Twitter(
                 self.account_uuid,
                 self.account_nickname,
-                self._fp_profile_path,
                 self.topic,
+                self._api_key,
+                self._api_secret,
+                self._access_token,
+                self._access_token_secret,
             )
-
-            # Share the pitch
             twitter.post(self.pitch)
-
-    def quit(self) -> None:
-        """
-        This method will be used to quit the browser.
-        """
-        # Quit the browser
-        self.browser.quit()

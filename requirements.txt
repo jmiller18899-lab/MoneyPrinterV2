@@ -9,6 +9,8 @@ webdriver_manager
 selenium
 ollama
 openai
+tweepy
+beautifulsoup4
 moviepy
 Pillow>=10.0.0
 yagmail
