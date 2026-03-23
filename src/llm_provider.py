@@ -1,4 +1,5 @@
 import ollama
+import requests
 from openai import OpenAI
 
 from config import (
@@ -8,12 +9,6 @@ from config import (
 )
 
 _selected_model: str | None = None
-
-_OPENROUTER_FREE_MODELS = [
-    "meta-llama/llama-3.1-8b-instruct:free",
-    "google/gemma-3-9b-it:free",
-    "mistralai/mistral-7b-instruct:free",
-]
 
 
 def _use_openrouter() -> bool:
@@ -35,14 +30,25 @@ def list_models() -> list[str]:
     """
     Lists available models.
 
-    When OpenRouter is configured, returns a list of recommended free models.
+    When OpenRouter is configured, fetches live free models from the OpenRouter API.
     Otherwise lists models available on the local Ollama server.
 
     Returns:
         models (list[str]): Sorted list of model names.
     """
     if _use_openrouter():
-        return _OPENROUTER_FREE_MODELS
+        resp = requests.get(
+            "https://openrouter.ai/api/v1/models",
+            headers={"Authorization": f"Bearer {get_openrouter_api_key()}"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json().get("data", [])
+        free = [
+            m["id"] for m in data
+            if str(m.get("pricing", {}).get("prompt", "1")) == "0"
+        ]
+        return sorted(free)
     response = _ollama_client().list()
     return sorted(m.model for m in response.models)
 

@@ -38,7 +38,7 @@ const FIELDS = [
   { key: 'ollama_base_url',    label: 'Ollama Base URL',         type: 'str', placeholder: 'http://127.0.0.1:11434' },
   { key: 'ollama_model',       label: 'Ollama Model',            type: 'str', placeholder: 'leave empty to pick at startup' },
   { key: 'openrouter_api_key', label: 'OpenRouter API Key',      type: 'str', placeholder: 'sk-or-… (overrides Ollama if set)' },
-  { key: 'openrouter_model',   label: 'OpenRouter Model',        type: 'str', placeholder: 'google/gemma-2-9b-it:free' },
+  { key: 'openrouter_model',   label: 'OpenRouter Model',        type: 'ormodel' },
   { key: 'twitter_language',   label: 'Twitter Language',        type: 'str', placeholder: 'English' },
   { key: 'nanobanana2_api_key',label: 'Gemini API Key',          type: 'str', placeholder: 'your-api-key' },
   { key: 'nanobanana2_aspect_ratio', label: 'Image Aspect Ratio', type: 'str', placeholder: '9:16' },
@@ -73,6 +73,20 @@ function renderForm(cfg) {
           <label class="form-check-label" style="font-size:.88rem">${f.label}</label>
           <div class="form-check form-switch mb-0">
             <input class="form-check-input" type="checkbox" id="cfg-${f.key}" ${val ? 'checked' : ''} />
+          </div>
+        </div>`;
+    }
+    if (f.type === 'ormodel') {
+      return `
+        <div class="mb-3">
+          <label class="form-label" style="font-size:.82rem;color:#aaa">${f.label}</label>
+          <div class="input-group input-group-sm">
+            <select class="form-select form-select-sm" id="cfg-${f.key}">
+              <option value="${val}">${val || 'Enter API key first, then refresh'}</option>
+            </select>
+            <button class="btn btn-outline-secondary btn-sm" type="button" id="btn-refresh-ormodels" title="Load free models from OpenRouter">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
           </div>
         </div>`;
     }
@@ -129,6 +143,31 @@ function collectForm(cfg) {
   }
   return out;
 }
+
+async function loadOpenRouterModels() {
+  const btn = document.getElementById('btn-refresh-ormodels');
+  const sel = document.getElementById('cfg-openrouter_model');
+  if (!btn || !sel) return;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  try {
+    const data = await fetch('/api/models').then(r => r.json());
+    if (data.error) { alert('Could not load models: ' + data.error); return; }
+    const current = sel.value;
+    sel.innerHTML = data.map(m =>
+      `<option value="${m}" ${m === current ? 'selected' : ''}>${m}</option>`
+    ).join('');
+  } catch(e) {
+    alert('Failed to load models. Make sure your OpenRouter API key is saved first.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i>';
+  }
+}
+
+document.addEventListener('click', e => {
+  if (e.target.closest('#btn-refresh-ormodels')) loadOpenRouterModels();
+});
 
 document.getElementById('btn-save-config').onclick = async () => {
   const updated = collectForm(_cfg);
