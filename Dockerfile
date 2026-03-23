@@ -7,6 +7,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     firefox-esr \
+    imagemagick \
     wget \
     libdbus-glib-1-2 \
     libgtk-3-0 \
