@@ -336,7 +336,7 @@ def get_openrouter_api_key() -> str:
 
 def get_openrouter_model() -> str:
     with open(os.path.join(ROOT_DIR, "config.json"), "r") as file:
-        return json.load(file).get("openrouter_model", "meta-llama/llama-3.1-8b-instruct:free")
+        return json.load(file).get("openrouter_model", "google/gemma-2-9b-it:free")
 
 def get_script_sentence_length() -> int:
     """
