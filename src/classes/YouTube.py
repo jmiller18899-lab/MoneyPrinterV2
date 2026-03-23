@@ -71,29 +71,17 @@ class YouTube:
         self._language: str = language
 
         self.images = []
+        self.browser = None
 
-        # Initialize the Firefox profile
-        self.options: Options = Options()
-
-        # Set headless state of browser
+    def _init_browser(self) -> None:
+        options: Options = Options()
         if get_headless():
-            self.options.add_argument("--headless")
-
-        if not os.path.isdir(self._fp_profile_path):
-            raise ValueError(
-                f"Firefox profile path does not exist or is not a directory: {self._fp_profile_path}"
-            )
-
-        self.options.add_argument("-profile")
-        self.options.add_argument(self._fp_profile_path)
-
-        # Set the service
-        self.service: Service = Service(GeckoDriverManager().install())
-
-        # Initialize the browser
-        self.browser: webdriver.Firefox = webdriver.Firefox(
-            service=self.service, options=self.options
-        )
+            options.add_argument("--headless")
+        if self._fp_profile_path and os.path.isdir(self._fp_profile_path):
+            options.add_argument("-profile")
+            options.add_argument(self._fp_profile_path)
+        service: Service = Service(GeckoDriverManager().install())
+        self.browser = webdriver.Firefox(service=service, options=options)
 
     @property
     def niche(self) -> str:
@@ -705,6 +693,7 @@ class YouTube:
             success (bool): Whether the upload was successful or not.
         """
         try:
+            self._init_browser()
             self.get_channel_id()
 
             driver = self.browser
