@@ -41,16 +41,22 @@ const FIELDS = [
   { key: 'openrouter_model',   label: 'OpenRouter Model',        type: 'ormodel' },
   { key: 'twitter_language',   label: 'Twitter Language',        type: 'str', placeholder: 'English' },
   { key: 'nanobanana2_api_key',label: 'Gemini API Key',          type: 'str', placeholder: 'your-api-key' },
+  { key: 'nanobanana2_api_base_url', label: 'Gemini API Base URL', type: 'str', placeholder: 'https://generativelanguage.googleapis.com/v1beta' },
+  { key: 'nanobanana2_model',  label: 'Gemini Image Model',      type: 'str', placeholder: 'gemini-3.1-flash-image-preview' },
   { key: 'nanobanana2_aspect_ratio', label: 'Image Aspect Ratio', type: 'str', placeholder: '9:16' },
   { key: 'threads',            label: 'MoviePy Threads',         type: 'num' },
   { key: 'zip_url',            label: 'Background Music ZIP URL',type: 'str', placeholder: 'https://…' },
   { key: 'is_for_kids',        label: 'YouTube: Is For Kids',    type: 'bool' },
+  { key: 'font',               label: 'Subtitle Font File',      type: 'str', placeholder: 'bold_font.ttf' },
   { key: 'imagemagick_path',   label: 'ImageMagick Path',        type: 'str', placeholder: '/usr/bin/convert' },
   { key: 'tts_voice',          label: 'TTS Voice',               type: 'str', placeholder: 'Jasper' },
   { key: 'stt_provider',       label: 'STT Provider',            type: 'str', placeholder: 'local_whisper or third_party_assemblyai' },
   { key: 'whisper_model',      label: 'Whisper Model',           type: 'str', placeholder: 'base' },
+  { key: 'whisper_device',     label: 'Whisper Device',          type: 'str', placeholder: 'auto' },
+  { key: 'whisper_compute_type', label: 'Whisper Compute Type',  type: 'str', placeholder: 'int8' },
   { key: 'assembly_ai_api_key',label: 'AssemblyAI API Key',      type: 'str', placeholder: 'your-api-key' },
   { key: 'script_sentence_length', label: 'Script Sentence Length', type: 'num' },
+  { key: 'google_maps_scraper', label: 'Maps Scraper ZIP URL',   type: 'str', placeholder: 'https://github.com/…' },
   { key: 'google_maps_scraper_niche', label: 'Outreach Niche',   type: 'str', placeholder: 'e.g. dentists in New York' },
   { key: 'scraper_timeout',    label: 'Scraper Timeout (s)',      type: 'num' },
   { key: 'outreach_message_subject', label: 'Outreach Subject',  type: 'str' },
@@ -169,25 +175,47 @@ document.addEventListener('click', e => {
   if (e.target.closest('#btn-refresh-ormodels')) loadOpenRouterModels();
 });
 
-document.getElementById('btn-save-config').onclick = async () => {
-  const updated = collectForm(_cfg);
-  const res = await apiPost('/api/config', updated);
+const _saveBtn = document.getElementById('btn-save-config');
+
+_saveBtn.onclick = async () => {
   const alertEl = document.getElementById('save-alert');
-  if (res.ok) {
-    alertEl.className = 'alert alert-success mb-3';
-    alertEl.textContent = 'Configuration saved successfully.';
-    _cfg = updated;
-  } else {
+  _saveBtn.disabled = true;
+  try {
+    const updated = collectForm(_cfg);
+    const r = await fetch('/api/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(updated)
+    });
+    const res = await r.json();
+    if (r.ok && res.ok) {
+      alertEl.className = 'alert alert-success mb-3';
+      alertEl.textContent = 'Configuration saved successfully.';
+      _cfg = updated;
+    } else {
+      alertEl.className = 'alert alert-danger mb-3';
+      alertEl.textContent = 'Failed to save configuration.';
+    }
+  } catch (err) {
     alertEl.className = 'alert alert-danger mb-3';
-    alertEl.textContent = 'Failed to save configuration.';
+    alertEl.textContent = 'Error saving configuration: ' + err.message;
+  } finally {
+    _saveBtn.disabled = false;
+    alertEl.classList.remove('d-none');
+    setTimeout(() => alertEl.classList.add('d-none'), 3000);
   }
-  alertEl.classList.remove('d-none');
-  setTimeout(() => alertEl.classList.add('d-none'), 3000);
 };
 
 (async () => {
-  _cfg = await fetch('/api/config').then(r => r.json());
+  _saveBtn.disabled = true;
+  try {
+    const r = await fetch('/api/config');
+    _cfg = await r.json();
+  } catch (err) {
+    _cfg = {};
+  }
   renderForm(_cfg);
+  _saveBtn.disabled = false;
 })();
 </script>
 {% endblock %}
