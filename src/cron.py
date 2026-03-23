@@ -52,11 +52,8 @@ def main():
                 twitter = Twitter(
                     acc["id"],
                     acc["nickname"],
+                    acc["firefox_profile"],
                     acc["topic"],
-                    api_key=acc.get("api_key", ""),
-                    api_secret=acc.get("api_secret", ""),
-                    access_token=acc.get("access_token", ""),
-                    access_token_secret=acc.get("access_token_secret", ""),
                 )
                 twitter.post()
                 if verbose:

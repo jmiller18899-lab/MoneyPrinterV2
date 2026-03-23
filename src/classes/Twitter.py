@@ -1,58 +1,110 @@
 import re
 import sys
-import json
+import time
 import os
-
-import tweepy
-from termcolor import colored
-from typing import List, Optional
-from datetime import datetime
+import json
 
 from cache import *
 from config import *
 from status import *
 from llm_provider import generate_text
+from typing import List, Optional
+from datetime import datetime
+from termcolor import colored
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.firefox.options import Options
+from webdriver_manager.firefox import GeckoDriverManager
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 
 class Twitter:
     """
-    Class for the Bot, that grows a Twitter account via the X/Twitter API v2.
+    Class for the Bot, that grows a Twitter account via Selenium + Firefox.
     """
 
     def __init__(
-        self,
-        account_uuid: str,
-        account_nickname: str,
-        topic: str,
-        api_key: str,
-        api_secret: str,
-        access_token: str,
-        access_token_secret: str,
+        self, account_uuid: str, account_nickname: str, fp_profile_path: str, topic: str
     ) -> None:
         self.account_uuid: str = account_uuid
         self.account_nickname: str = account_nickname
+        self.fp_profile_path: str = fp_profile_path
         self.topic: str = topic
 
-        if not all([api_key, api_secret, access_token, access_token_secret]):
+        self.options: Options = Options()
+
+        if get_headless():
+            self.options.add_argument("--headless")
+
+        if not os.path.isdir(fp_profile_path):
             raise ValueError(
-                "Twitter API credentials are required. "
-                "Set api_key, api_secret, access_token, and access_token_secret on the account."
+                f"Firefox profile path does not exist or is not a directory: {fp_profile_path}"
             )
 
-        self._client = tweepy.Client(
-            consumer_key=api_key,
-            consumer_secret=api_secret,
-            access_token=access_token,
-            access_token_secret=access_token_secret,
+        self.options.add_argument("-profile")
+        self.options.add_argument(fp_profile_path)
+
+        self.service: Service = Service(GeckoDriverManager().install())
+        self.browser: webdriver.Firefox = webdriver.Firefox(
+            service=self.service, options=self.options
         )
+        self.wait: WebDriverWait = WebDriverWait(self.browser, 30)
 
     def post(self, text: Optional[str] = None) -> None:
+        bot: webdriver.Firefox = self.browser
+        verbose: bool = get_verbose()
+
+        bot.get("https://x.com/compose/post")
+
         post_content: str = text if text is not None else self.generate_post()
         now: datetime = datetime.now()
 
         print(colored(" => Posting to Twitter:", "blue"), post_content[:30] + "...")
 
-        self._client.create_tweet(text=post_content)
+        text_box = None
+        text_box_selectors = [
+            (By.CSS_SELECTOR, "div[data-testid='tweetTextarea_0'][role='textbox']"),
+            (By.XPATH, "//div[@data-testid='tweetTextarea_0']//div[@role='textbox']"),
+            (By.XPATH, "//div[@role='textbox']"),
+        ]
+
+        for selector in text_box_selectors:
+            try:
+                text_box = self.wait.until(EC.element_to_be_clickable(selector))
+                text_box.click()
+                text_box.send_keys(post_content)
+                break
+            except Exception:
+                continue
+
+        if text_box is None:
+            raise RuntimeError(
+                "Could not find tweet text box. Ensure you are logged into X in this Firefox profile."
+            )
+
+        post_button = None
+        post_button_selectors = [
+            (By.XPATH, "//button[@data-testid='tweetButtonInline']"),
+            (By.XPATH, "//button[@data-testid='tweetButton']"),
+            (By.XPATH, "//span[text()='Post']/ancestor::button"),
+        ]
+
+        for selector in post_button_selectors:
+            try:
+                post_button = self.wait.until(EC.element_to_be_clickable(selector))
+                post_button.click()
+                break
+            except Exception:
+                continue
+
+        if post_button is None:
+            raise RuntimeError("Could not find the Post button on X compose screen.")
+
+        if verbose:
+            print(colored(" => Pressed Post button on Twitter.", "blue"))
+        time.sleep(2)
 
         self.add_post({"content": post_content, "date": now.strftime("%m/%d/%Y, %H:%M:%S")})
         success("Posted to Twitter successfully!")
@@ -66,13 +118,13 @@ class Twitter:
             parsed = json.load(file)
             for account in parsed["accounts"]:
                 if account["id"] == self.account_uuid:
-                    return account.get("posts") or []
+                    posts = account.get("posts")
+                    return posts if posts is not None else []
 
         return []
 
     def add_post(self, post: dict) -> None:
-        posts = self.get_posts()
-        posts.append(post)
+        self.get_posts()
 
         with open(get_twitter_cache_path(), "r") as file:
             previous_json = json.loads(file.read())

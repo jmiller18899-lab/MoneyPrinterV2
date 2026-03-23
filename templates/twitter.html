@@ -51,9 +51,7 @@
       </div>
       <div class="modal-body">
         <p class="text-muted" style="font-size:.82rem">
-          Get your credentials at
-          <a href="https://developer.twitter.com/en/portal/dashboard" target="_blank" class="text-accent">developer.twitter.com</a>
-          — create a project, enable OAuth 1.0a with Read &amp; Write permissions.
+          The account must already be logged in to X/Twitter inside the Firefox profile you provide.
         </p>
         <div class="mb-3">
           <label class="form-label">Nickname</label>
@@ -63,23 +61,9 @@
           <label class="form-label">Topic</label>
           <input id="tw-topic" class="form-control" placeholder="e.g. Artificial Intelligence" />
         </div>
-        <hr class="border-secondary" />
-        <div class="fw-semibold mb-2" style="font-size:.85rem;color:#aaa">Twitter API Credentials</div>
         <div class="mb-3">
-          <label class="form-label">API Key (Consumer Key)</label>
-          <input id="tw-api-key" class="form-control" placeholder="your API key" />
-        </div>
-        <div class="mb-3">
-          <label class="form-label">API Secret (Consumer Secret)</label>
-          <input id="tw-api-secret" class="form-control" type="password" placeholder="your API secret" />
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Access Token</label>
-          <input id="tw-access-token" class="form-control" placeholder="your access token" />
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Access Token Secret</label>
-          <input id="tw-access-token-secret" class="form-control" type="password" placeholder="your access token secret" />
+          <label class="form-label">Firefox Profile Path</label>
+          <input id="tw-firefox-profile" class="form-control" placeholder="/path/to/firefox/profile" />
         </div>
       </div>
       <div class="modal-footer border-secondary">
@@ -168,16 +152,13 @@ async function loadPosts(accountId, nickname) {
 }
 
 document.getElementById('btn-add-tw-account').onclick = async () => {
-  const nickname          = document.getElementById('tw-nickname').value.trim();
-  const topic             = document.getElementById('tw-topic').value.trim();
-  const api_key           = document.getElementById('tw-api-key').value.trim();
-  const api_secret        = document.getElementById('tw-api-secret').value.trim();
-  const access_token      = document.getElementById('tw-access-token').value.trim();
-  const access_token_secret = document.getElementById('tw-access-token-secret').value.trim();
-  if (!nickname || !topic || !api_key || !api_secret || !access_token || !access_token_secret) {
-    return alert('Please fill in all fields including API credentials.');
+  const nickname         = document.getElementById('tw-nickname').value.trim();
+  const topic            = document.getElementById('tw-topic').value.trim();
+  const firefox_profile  = document.getElementById('tw-firefox-profile').value.trim();
+  if (!nickname || !topic || !firefox_profile) {
+    return alert('Please fill in all fields.');
   }
-  await apiPost('/api/accounts/twitter', { nickname, topic, api_key, api_secret, access_token, access_token_secret });
+  await apiPost('/api/accounts/twitter', { nickname, topic, firefox_profile });
   bootstrap.Modal.getInstance(document.getElementById('addTwAccountModal')).hide();
   loadTwAccounts();
 };

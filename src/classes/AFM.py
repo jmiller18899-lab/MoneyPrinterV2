@@ -27,13 +27,10 @@ class AffiliateMarketing:
     def __init__(
         self,
         affiliate_link: str,
+        fp_profile_path: str,
         twitter_account_uuid: str,
         account_nickname: str,
         topic: str,
-        api_key: str,
-        api_secret: str,
-        access_token: str,
-        access_token_secret: str,
     ) -> None:
         parsed_link = urlparse(affiliate_link)
         if parsed_link.scheme not in ["http", "https"] or not parsed_link.netloc:
@@ -42,13 +39,10 @@ class AffiliateMarketing:
             )
 
         self.affiliate_link: str = affiliate_link
+        self.fp_profile_path: str = fp_profile_path
         self.account_uuid: str = twitter_account_uuid
         self.account_nickname: str = account_nickname
         self.topic: str = topic
-        self._api_key = api_key
-        self._api_secret = api_secret
-        self._access_token = access_token
-        self._access_token_secret = access_token_secret
 
         self.scrape_product_information()
 
@@ -91,10 +85,7 @@ class AffiliateMarketing:
             twitter = Twitter(
                 self.account_uuid,
                 self.account_nickname,
+                self.fp_profile_path,
                 self.topic,
-                self._api_key,
-                self._api_secret,
-                self._access_token,
-                self._access_token_secret,
             )
             twitter.post(self.pitch)

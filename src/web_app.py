@@ -224,11 +224,8 @@ def _twitter_post(account_id: str) -> str:
     tw = Twitter(
         acc["id"],
         acc["nickname"],
+        acc["firefox_profile"],
         acc["topic"],
-        api_key=acc.get("api_key", ""),
-        api_secret=acc.get("api_secret", ""),
-        access_token=acc.get("access_token", ""),
-        access_token_secret=acc.get("access_token_secret", ""),
     )
     tw.post()
     return "Tweet posted"
@@ -247,13 +244,10 @@ def _afm_run(product_id: str) -> str:
         raise ValueError("Linked Twitter account not found")
     afm = AffiliateMarketing(
         product["affiliate_link"],
+        acc["firefox_profile"],
         acc["id"],
         acc["nickname"],
         acc["topic"],
-        api_key=acc.get("api_key", ""),
-        api_secret=acc.get("api_secret", ""),
-        access_token=acc.get("access_token", ""),
-        access_token_secret=acc.get("access_token_secret", ""),
     )
     afm.generate_pitch()
     afm.share_pitch("twitter")
