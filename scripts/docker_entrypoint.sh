@@ -27,8 +27,8 @@ if not cfg.get("firefox_profile"):
     cfg["firefox_profile"] = "/data/firefox-profile"
     changed = True
 
-# Enable headless mode for Docker (no display available) — only if not explicitly set
-if "headless" not in cfg:
+# Enable headless mode for Docker (no display server available)
+if not cfg.get("headless"):
     cfg["headless"] = True
     changed = True
 
