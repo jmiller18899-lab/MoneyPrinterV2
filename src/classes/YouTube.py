@@ -27,9 +27,6 @@ from moviepy.video.tools.subtitles import SubtitlesClip
 from webdriver_manager.firefox import GeckoDriverManager
 from datetime import datetime
 
-# Set ImageMagick Path
-change_settings({"IMAGEMAGICK_BINARY": get_imagemagick_path()})
-
 
 class YouTube:
     """
@@ -557,6 +554,7 @@ class YouTube:
         """
         combined_image_path = os.path.join(ROOT_DIR, ".mp", str(uuid4()) + ".mp4")
         threads = get_threads()
+        change_settings({"IMAGEMAGICK_BINARY": get_imagemagick_path()})
         tts_clip = AudioFileClip(self.tts_path)
         max_duration = tts_clip.duration
         req_dur = max_duration / len(self.images)
