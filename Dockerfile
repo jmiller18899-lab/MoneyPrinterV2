@@ -12,5 +12,8 @@ COPY . /app
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Run src/main.py when the container launches
-ENTRYPOINT ["python", "src/main.py"]
+# Expose the port for Railway
+EXPOSE 5000
+
+# Run app.py when the container launches
+ENTRYPOINT ["python", "app.py"]
