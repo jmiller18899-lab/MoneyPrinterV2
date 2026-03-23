@@ -25,5 +25,7 @@ COPY . /app
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Run src/main.py when the container launches
-ENTRYPOINT ["python", "src/main.py"]
+# At container start, patch config.json with Docker-specific defaults, then run the app
+COPY scripts/docker_entrypoint.sh /app/scripts/docker_entrypoint.sh
+RUN chmod +x /app/scripts/docker_entrypoint.sh
+ENTRYPOINT ["/app/scripts/docker_entrypoint.sh"]
